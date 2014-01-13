@@ -63,6 +63,12 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     byte[] passwd;
     Random rand = new Random();
 
+    long previous = 0;
+    byte bytes[];
+    int latencyIndex = -1;
+    AtomicLong completedRequests = new AtomicLong(0);
+    long duration = -1;
+
     static class Context {
         long localStartTime;
         long id;
@@ -120,12 +126,6 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         bk.close();
     }
 
-    long previous = 0;
-    byte bytes[];
-    int latencyIndex = -1;
-    AtomicLong completedRequests = new AtomicLong(0);
-    long duration = -1;
-
     synchronized public long getDuration() {
         return duration;
     }
@@ -160,23 +160,21 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                     LOG.info("Time to send first batch: {}s {}ns ",
                              time/1000/1000/1000, time);
                 }
+                final int index = getRandomLedger();
+                LedgerHandle h = null;
+                try {
+                    h = getLedger(index);
+                } catch (BKException e) {
+                    e.printStackTrace();  // TODO: Customise this generated block
+                }
+                long nanoTime = System.nanoTime();
+                h.asyncAddEntry(bytes, this, new Context(sent, nanoTime));
+                counter.incrementAndGet();
+                sent++;
             } catch (InterruptedException e) {
                 break;
             }
 
-            final int index = getRandomLedger();
-            LedgerHandle h = null;
-            try {
-                h = getLedger(index);
-            } catch (BKException e) {
-                e.printStackTrace();  // TODO: Customise this generated block
-            } catch (InterruptedException e) {
-                e.printStackTrace();  // TODO: Customise this generated block
-            }
-            long nanoTime = System.nanoTime();
-            h.asyncAddEntry(bytes, this, new Context(sent, nanoTime));
-            counter.incrementAndGet();
-            sent++;
         }
         LOG.info("Sent: "  + sent);
         try {
