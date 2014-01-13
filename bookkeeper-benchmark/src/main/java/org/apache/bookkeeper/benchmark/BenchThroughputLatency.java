@@ -406,6 +406,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         LOG.info("95th percentile latency: {}", percentile(latency, 95));
 
         bench.close();
+        LOG.info("Ledgers closed");
         timeouter.cancel();
     }
 
