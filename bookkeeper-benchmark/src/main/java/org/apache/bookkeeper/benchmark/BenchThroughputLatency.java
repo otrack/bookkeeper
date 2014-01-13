@@ -19,42 +19,30 @@
  */
 package org.apache.bookkeeper.benchmark;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.Timer;
-import java.util.TimerTask;
-
+import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.LedgerHandle;
-import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.PosixParser;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.commons.cli.*;
+import org.apache.zookeeper.*;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Charsets.UTF_8;
 
@@ -69,6 +57,11 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     int numberOfLedgers = 1;
     final int sendLimit;
     final long latencies[];
+    int ensemble;
+    int writeQuorumSize;
+    int ackQuorumSize;
+    byte[] passwd;
+    Random rand = new Random();
 
     static class Context {
         long localStartTime;
@@ -84,50 +77,55 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
             int numberOfLedgers, int sendLimit, ClientConfiguration conf)
             throws KeeperException, IOException, InterruptedException {
         this.sem = new Semaphore(conf.getThrottleValue());
-        bk = new BookKeeper(conf);
+        this.bk = new BookKeeper(conf);
         this.counter = new AtomicLong(0);
         this.numberOfLedgers = numberOfLedgers;
         this.sendLimit = sendLimit;
         this.latencies = new long[sendLimit];
-        try{
-            lh = new LedgerHandle[this.numberOfLedgers];
-
-            for(int i = 0; i < this.numberOfLedgers; i++) {
-                lh[i] = bk.createLedger(ensemble, writeQuorumSize,
-                                        ackQuorumSize,
-                                        BookKeeper.DigestType.CRC32,
-                                        passwd);
-                LOG.debug("Ledger Handle: " + lh[i].getId());
-            }
-        } catch (BKException e) {
-            e.printStackTrace();
-        }
+        this.ensemble = ensemble;
+        this.writeQuorumSize = writeQuorumSize;
+        this.ackQuorumSize = ackQuorumSize;
+        this.passwd = passwd;
+        lh = new LedgerHandle[this.numberOfLedgers];
     }
 
-    Random rand = new Random();
+    void setEntryData(byte data[]) {
+        bytes = data;
+    }
+
+    private int getRandomLedger() {
+        return rand.nextInt(numberOfLedgers);
+    }
+
+    private LedgerHandle getLedger(int i) throws BKException, InterruptedException {
+        if(lh[i]==null){
+            lh[i] = this.bk.createLedger(this.ensemble, this.writeQuorumSize,
+                    this.ackQuorumSize,
+                    BookKeeper.DigestType.CRC32,
+                    this.passwd);
+            LOG.debug("Creating ledger Handle: " + lh[i].getId());
+        }
+        return lh[i];
+    }
+
+    public void removeLedger(int i) throws BKException, InterruptedException {
+        if(lh[i]!=null)
+            lh[i].close();
+    }
+
     public void close() throws InterruptedException, BKException {
         for(int i = 0; i < numberOfLedgers; i++) {
-            lh[i].close();
+            removeLedger(i);
         }
         bk.close();
     }
 
     long previous = 0;
     byte bytes[];
-
-    void setEntryData(byte data[]) {
-        bytes = data;
-    }
-
-    int lastLedger = 0;
-    private int getRandomLedger() {
-         return rand.nextInt(numberOfLedgers);
-    }
-
     int latencyIndex = -1;
     AtomicLong completedRequests = new AtomicLong(0);
-
     long duration = -1;
+
     synchronized public long getDuration() {
         return duration;
     }
@@ -167,14 +165,17 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
             }
 
             final int index = getRandomLedger();
-            LedgerHandle h = lh[index];
-            if (h == null) {
-                LOG.error("Handle " + index + " is null!");
-            } else {
-                long nanoTime = System.nanoTime();
-                lh[index].asyncAddEntry(bytes, this, new Context(sent, nanoTime));
-                counter.incrementAndGet();
+            LedgerHandle h = null;
+            try {
+                h = getLedger(index);
+            } catch (BKException e) {
+                e.printStackTrace();  // TODO: Customise this generated block
+            } catch (InterruptedException e) {
+                e.printStackTrace();  // TODO: Customise this generated block
             }
+            long nanoTime = System.nanoTime();
+            h.asyncAddEntry(bytes, this, new Context(sent, nanoTime));
+            counter.incrementAndGet();
             sent++;
         }
         LOG.info("Sent: "  + sent);
@@ -442,7 +443,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                 LOG.error("Couldn't connect to zookeeper at " + servers);
                 throw new IOException("Couldn't connect to zookeeper " + servers);
             }
-            bookies = zk.getChildren(bookieRegistrationPath, false).size();
+            bookies = zk.getChildren(bookieRegistrationPath, false).size() - 1;
         } finally {
             if (zk != null) {
                 zk.close();
