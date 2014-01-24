@@ -117,6 +117,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     public void removeLedger(int i) throws BKException, InterruptedException {
         if(lh[i]!=null)
             lh[i].close();
+        lh[i] = null;
     }
 
     public void close() throws InterruptedException, BKException {

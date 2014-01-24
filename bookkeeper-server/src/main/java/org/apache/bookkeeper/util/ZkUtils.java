@@ -21,24 +21,24 @@
 
 package org.apache.bookkeeper.util;
 
+import ch.unine.zkpartitioned.ZooKeeperPartitioned;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase;
+import org.apache.zookeeper.AsyncCallback;
+import org.apache.zookeeper.AsyncCallback.StringCallback;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.Code;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
-import org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.AsyncCallback;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.AsyncCallback.StringCallback;
-import org.apache.zookeeper.KeeperException.Code;
-import org.apache.zookeeper.data.ACL;
-import org.apache.zookeeper.ZooKeeper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provided utilites for zookeeper access, etc.
@@ -245,8 +245,7 @@ public class ZkUtils {
         if (servers == null || servers.isEmpty()) {
             throw new IllegalArgumentException("servers cannot be empty");
         }
-        final ZooKeeper newZk = new ZooKeeper(servers, w.getZkSessionTimeOut(),
-                w);
+        final ZooKeeper newZk = new ZooKeeperPartitioned(servers, w.getZkSessionTimeOut(),w);
         w.waitForConnection();
         // Re-checking zookeeper connection status
         if (!newZk.getState().isConnected()) {

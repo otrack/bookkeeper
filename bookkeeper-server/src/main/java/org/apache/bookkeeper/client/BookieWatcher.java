@@ -255,6 +255,10 @@ class BookieWatcher implements Watcher, ChildrenCallback {
                     + BookKeeperConstants.READONLY;
             if (null == bk.getZkHandle().exists(readOnlyBookieRegPath, false)) {
                 try {
+                    bk.getZkHandle().create(conf.getZkLedgersRootPath(), new byte[0], Ids.OPEN_ACL_UNSAFE,
+                            CreateMode.PERSISTENT);
+                    bk.getZkHandle().create(conf.getZkAvailableBookiesPath(), new byte[0], Ids.OPEN_ACL_UNSAFE,
+                            CreateMode.PERSISTENT);
                     bk.getZkHandle().create(readOnlyBookieRegPath, new byte[0], Ids.OPEN_ACL_UNSAFE,
                             CreateMode.PERSISTENT);
                 } catch (NodeExistsException e) {
