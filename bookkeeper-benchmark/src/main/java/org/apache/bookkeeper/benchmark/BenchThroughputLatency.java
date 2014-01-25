@@ -19,6 +19,7 @@
  */
 package org.apache.bookkeeper.benchmark;
 
+import ch.unine.zkpartitioned.ZooKeeperPartitioned;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -327,11 +328,11 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                 passwd, ledgers, sendLimit, conf);
         bench.setEntryData(data);
         thread = new Thread(bench);
-        ZooKeeper zk = null;
+        ZooKeeperPartitioned zk = null;
 
         if (coordinationZnode != null) {
             final CountDownLatch connectLatch = new CountDownLatch(1);
-            zk = new ZooKeeper(servers, 15000, new Watcher() {
+            zk = new ZooKeeperPartitioned(servers, 15000, new Watcher() {
                     @Override
                     public void process(WatchedEvent event) {
                         if (event.getState() == KeeperState.SyncConnected) {
@@ -430,10 +431,10 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         final CountDownLatch connectLatch = new CountDownLatch(1);
         final int bookies;
         String bookieRegistrationPath = conf.getZkAvailableBookiesPath();
-        ZooKeeper zk = null;
+        ZooKeeperPartitioned zk = null;
         try {
             final String servers = conf.getZkServers();
-            zk = new ZooKeeper(servers, 15000, new Watcher() {
+            zk = new ZooKeeperPartitioned(servers, 15000, new Watcher() {
                     @Override
                     public void process(WatchedEvent event) {
                         if (event.getState() == KeeperState.SyncConnected) {
