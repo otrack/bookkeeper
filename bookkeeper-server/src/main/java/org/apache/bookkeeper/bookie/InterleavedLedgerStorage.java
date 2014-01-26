@@ -21,9 +21,6 @@
 
 package org.apache.bookkeeper.bookie;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.bookie.EntryLogger.EntryLogListener;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -33,6 +30,9 @@ import org.apache.bookkeeper.proto.BookieProtocol;
 import org.apache.bookkeeper.util.SnapshotMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Interleave ledger storage
@@ -100,7 +100,7 @@ class InterleavedLedgerStorage implements LedgerStorage, EntryLogListener {
 
     @Override
     public void start() {
-        gcThread.start();
+        // gcThread.start();
     }
 
     @Override

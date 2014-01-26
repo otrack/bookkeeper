@@ -18,10 +18,6 @@ package org.apache.bookkeeper.meta;
  * limitations under the License.
  */
 
-import java.io.IOException;
-import java.util.NoSuchElementException;
-import java.util.Set;
-
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.conf.AbstractConfiguration;
@@ -38,6 +34,11 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.NoSuchElementException;
+import java.util.Random;
+import java.util.Set;
 
 /**
  * Manage all ledgers in a single zk node.
@@ -93,8 +94,9 @@ class FlatLedgerManager extends AbstractZkLedgerManager {
                 }
             }
         };
-        ZkUtils.asyncCreateFullPathOptimistic(zk, ledgerPrefix, metadata.serialize(),
-            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL, scb, null);
+        Random rand = new Random(System.currentTimeMillis());
+        ZkUtils.asyncCreateFullPathOptimistic(zk, ledgerPrefix+rand.nextInt(Integer.MAX_VALUE), metadata.serialize(),
+            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, scb, null);
     }
 
     @Override

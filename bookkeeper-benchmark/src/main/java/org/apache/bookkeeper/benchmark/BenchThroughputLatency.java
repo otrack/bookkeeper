@@ -36,10 +36,7 @@ import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +48,8 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     static final Logger LOG = LoggerFactory.getLogger(BenchThroughputLatency.class);
 
     BookKeeper bk;
-    LedgerHandle lh[];
+    Map<Long,LedgerHandle> lh;
+    Map<Long,Integer> fadeaway;
     AtomicLong counter;
 
     Semaphore sem;
@@ -62,7 +60,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     int writeQuorumSize;
     int ackQuorumSize;
     byte[] passwd;
-    Random rand = new Random();
+    Random rand = new Random(System.nanoTime());
 
     long previous = 0;
     byte bytes[];
@@ -73,10 +71,12 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     static class Context {
         long localStartTime;
         long id;
+        long ledger;
 
-        Context(long id, long time){
+        Context(long id, long time, long ledger){
             this.id = id;
             this.localStartTime = time;
+            this.ledger = ledger;
         }
     }
 
@@ -93,37 +93,48 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         this.writeQuorumSize = writeQuorumSize;
         this.ackQuorumSize = ackQuorumSize;
         this.passwd = passwd;
-        lh = new LedgerHandle[this.numberOfLedgers];
+        lh = new HashMap<Long, LedgerHandle>();
+        fadeaway = new HashMap<Long, Integer>();
     }
 
     void setEntryData(byte data[]) {
         bytes = data;
     }
 
-    private int getRandomLedger() {
-        return rand.nextInt(numberOfLedgers);
+    private long getRandomLedgerIndex() {
+        return rand.nextLong()%this.numberOfLedgers;
     }
 
-    private LedgerHandle getLedger(int i) throws BKException, InterruptedException {
-        if(lh[i]==null){
-            lh[i] = this.bk.createLedger(this.ensemble, this.writeQuorumSize,
+    private LedgerHandle getLedger(long i) throws BKException, InterruptedException {
+        LedgerHandle ledgerHandle;
+        if(!lh.containsKey(i)){
+            ledgerHandle = this.bk.createLedger(this.ensemble, this.writeQuorumSize,
                     this.ackQuorumSize,
                     BookKeeper.DigestType.CRC32,
                     this.passwd);
-            LOG.debug("Creating ledger Handle: " + lh[i].getId());
+            LOG.debug("Creating ledger Handle: " + ledgerHandle.getId());
+            lh.put(i,ledgerHandle);
+            fadeaway.put(i,100);
+        }else{
+            ledgerHandle = lh.get(i);
+            synchronized (fadeaway){
+                fadeaway.put(i,fadeaway.get(i)-1);
+                if(fadeaway.get(i).equals(0))
+                    lh.remove(i);
+            }
         }
-        return lh[i];
+        return ledgerHandle;
+
     }
 
-    public void removeLedger(int i) throws BKException, InterruptedException {
-        if(lh[i]!=null)
-            lh[i].close();
-        lh[i] = null;
+    public void closeLedger(long i) throws BKException, InterruptedException {
+        if(lh.get(i)!=null)
+            lh.get(i).close();
     }
 
     public void close() throws InterruptedException, BKException {
         for(int i = 0; i < numberOfLedgers; i++) {
-            removeLedger(i);
+            closeLedger(i);
         }
         bk.close();
     }
@@ -162,7 +173,8 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                     LOG.info("Time to send first batch: {}s {}ns ",
                              time/1000/1000/1000, time);
                 }
-                final int index = getRandomLedger();
+                long index=0;
+                index = getRandomLedgerIndex();
                 LedgerHandle h = null;
                 try {
                     h = getLedger(index);
@@ -170,7 +182,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                     e.printStackTrace();  // TODO: Customise this generated block
                 }
                 long nanoTime = System.nanoTime();
-                h.asyncAddEntry(bytes, this, new Context(sent, nanoTime));
+                h.asyncAddEntry(bytes, this, new Context(sent, nanoTime, index));
                 counter.incrementAndGet();
                 sent++;
             } catch (InterruptedException e) {
@@ -221,14 +233,13 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         // multiple ledgers, and it works even with one ledger
         entryId = context.id;
         long newTime = System.nanoTime() - context.localStartTime;
-
-        sem.release();
-        counter.decrementAndGet();
-
         if (rc == 0) {
             latencies[(int)entryId] = newTime;
             completedRequests.incrementAndGet();
         }
+
+        sem.release();
+        counter.decrementAndGet();
     }
 
     @SuppressWarnings("deprecation")

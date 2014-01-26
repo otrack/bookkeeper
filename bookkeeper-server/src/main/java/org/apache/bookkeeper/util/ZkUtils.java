@@ -245,7 +245,12 @@ public class ZkUtils {
         if (servers == null || servers.isEmpty()) {
             throw new IllegalArgumentException("servers cannot be empty");
         }
-        final ZooKeeper newZk = new ZooKeeperPartitioned(servers, w.getZkSessionTimeOut(),w);
+        ZooKeeper newZk = null;
+        if(servers.contains("/")){
+            newZk = new ZooKeeperPartitioned(servers, w.getZkSessionTimeOut(),w);
+        }else{
+            newZk = new ZooKeeper(servers, w.getZkSessionTimeOut(),w);
+        }
         w.waitForConnection();
         // Re-checking zookeeper connection status
         if (!newZk.getState().isConnected()) {
