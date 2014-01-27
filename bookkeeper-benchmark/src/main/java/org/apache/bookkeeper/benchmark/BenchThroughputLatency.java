@@ -185,6 +185,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                 break;
             } catch (BKException be){
                 be.printStackTrace();
+                break;
             }
 
         }
