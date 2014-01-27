@@ -134,9 +134,13 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
             lh.get(i).close();
     }
 
-    public void close() throws InterruptedException, BKException {
+    public void close() throws InterruptedException{
         for(int i = 0; i < numberOfLedgers; i++) {
-            closeLedger(i);
+            try {
+                closeLedger(i);
+            } catch (BKException e) {
+                e.printStackTrace();  // TODO: Customise this generated block
+            }
         }
         bk.close();
     }
