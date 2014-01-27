@@ -3,6 +3,7 @@ package org.apache.bookkeeper.benchmark;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 
+import java.io.Serializable;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -12,7 +13,7 @@ import java.util.concurrent.CountDownLatch;
  * @since 4.0
  */
 
-public class CoordinationWatcher implements Watcher {
+public class CoordinationWatcher implements Watcher,Serializable {
 
     CountDownLatch latch;
 
