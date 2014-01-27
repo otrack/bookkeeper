@@ -49,7 +49,8 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
 
     BookKeeper bk;
     Map<Long,LedgerHandle> lh;
-    Map<Long,Integer> fadeaway;
+    Map<Long,Integer> fd;
+    int fadeaway;
     AtomicLong counter;
 
     Semaphore sem;
@@ -83,7 +84,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     }
 
     public BenchThroughputLatency(int ensemble, int writeQuorumSize, int ackQuorumSize, byte[] passwd,
-            int numberOfLedgers, int sendLimit, ClientConfiguration conf)
+            int numberOfLedgers, int sendLimit, ClientConfiguration conf, int fadeaway)
             throws KeeperException, IOException, InterruptedException {
         this.sem = new Semaphore(conf.getThrottleValue());
         this.bk = new BookKeeper(conf);
@@ -96,7 +97,8 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         this.ackQuorumSize = ackQuorumSize;
         this.passwd = passwd;
         lh = new HashMap<Long, LedgerHandle>();
-        fadeaway = new HashMap<Long, Integer>();
+        this.fd = new HashMap<Long, Integer>();
+        this.fadeaway= fadeaway;
     }
 
     void setEntryData(byte data[]) {
@@ -116,12 +118,12 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                     this.passwd);
             LOG.debug("Creating ledger Handle: " + ledgerHandle.getId());
             lh.put(i,ledgerHandle);
-            fadeaway.put(i,100);
+            fd.put(i, this.fadeaway);
         }else{
             ledgerHandle = lh.get(i);
-            synchronized (fadeaway){
-                fadeaway.put(i,fadeaway.get(i)-1);
-                if(fadeaway.get(i).equals(0))
+            synchronized (fd){
+                fd.put(i,fd.get(i)-1);
+                if(fd.get(i).equals(0))
                     lh.remove(i);
             }
         }
@@ -262,6 +264,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         options.addOption("skipwarmup", false, "Skip warm up, default false");
         options.addOption("sendlimit", true, "Max number of entries to send. Default 20000000");
         options.addOption("latencyFile", true, "File to dump latencies. Default is latencyDump.dat");
+        options.addOption("fadeaway", true, "Amount of operation on the same ledger before switching. Default 1000");
         options.addOption("help", false, "This message");
 
         CommandLineParser parser = new PosixParser();
@@ -276,6 +279,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         long runningTime = Long.valueOf(cmd.getOptionValue("time", "60"));
         String servers = cmd.getOptionValue("zookeeper", "localhost:2181");
         int entrysize = Integer.valueOf(cmd.getOptionValue("entrysize", "1024"));
+        int fadeaway = Integer.valueOf(cmd.getOptionValue("fadeaway", "1024"));
 
         int ledgers = Integer.valueOf(cmd.getOptionValue("ledgers", "1"));
         int ensemble = Integer.valueOf(cmd.getOptionValue("ensemble", "3"));
@@ -337,7 +341,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
 
         // Now do the benchmark
         BenchThroughputLatency bench = new BenchThroughputLatency(ensemble, quorum, ackQuorum,
-                passwd, ledgers, sendLimit, conf);
+                passwd, ledgers, sendLimit, conf, fadeaway);
         bench.setEntryData(data);
         thread = new Thread(bench);
         ZooKeeperPartitioned zk = null;
@@ -465,7 +469,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         }
 
         BenchThroughputLatency warmup = new BenchThroughputLatency(bookies, bookies, bookies, passwd,
-                                                                   ledgers, 10000, conf);
+                                                                   ledgers, 10000, conf,1000);
         warmup.setEntryData(data);
         Thread thread = new Thread(warmup);
         thread.start();
