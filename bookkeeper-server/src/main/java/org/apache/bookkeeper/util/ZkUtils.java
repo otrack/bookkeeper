@@ -246,7 +246,7 @@ public class ZkUtils {
             throw new IllegalArgumentException("servers cannot be empty");
         }
         ZooKeeper newZk = null;
-        if(servers.contains("/")){
+        if(servers.contains(ZooKeeperPartitioned.ZKP_SEPARATOR)){
             newZk = new ZooKeeperPartitioned(servers, w.getZkSessionTimeOut(),w);
         }else{
             newZk = new ZooKeeper(servers, w.getZkSessionTimeOut(),w);

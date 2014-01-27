@@ -176,17 +176,15 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
                 long index=0;
                 index = getRandomLedgerIndex();
                 LedgerHandle h = null;
-                try {
-                    h = getLedger(index);
-                } catch (BKException e) {
-                    e.printStackTrace();  // TODO: Customise this generated block
-                }
+                h = getLedger(index);
                 long nanoTime = System.nanoTime();
                 h.asyncAddEntry(bytes, this, new Context(sent, nanoTime, index));
                 counter.incrementAndGet();
                 sent++;
             } catch (InterruptedException e) {
                 break;
+            } catch (BKException be){
+                be.printStackTrace();
             }
 
         }
