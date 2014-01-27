@@ -362,9 +362,16 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
 
             final CountDownLatch latch = new CountDownLatch(1);
             LOG.info("Waiting for " + coordinationZnode);
-            if (zk.exists(coordinationZnode, new CoordinationWatcher(latch)) != null) {
+            if (zk.zookeepers.get(0).exists(coordinationZnode, new Watcher() {
+                @Override
+                public void process(WatchedEvent event) {
+                    if (event.getType() == Event.EventType.NodeCreated) {
+                        latch.countDown();
+                    }
+                }}) != null) {
                 latch.countDown();
             }
+
             latch.await();
             LOG.info("Coordination znode created");
         }
