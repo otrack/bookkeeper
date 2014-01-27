@@ -27,7 +27,6 @@ import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.commons.cli.*;
 import org.apache.zookeeper.*;
-import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -363,13 +362,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
 
             final CountDownLatch latch = new CountDownLatch(1);
             LOG.info("Waiting for " + coordinationZnode);
-            if (zk.exists(coordinationZnode, new Watcher() {
-                @Override
-                public void process(WatchedEvent event) {
-                    if (event.getType() == EventType.NodeCreated) {
-                        latch.countDown();
-                    }
-                }}) != null) {
+            if (zk.exists(coordinationZnode, new CoordinationWatcher(latch)) != null) {
                 latch.countDown();
             }
             latch.await();
@@ -477,4 +470,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         warmup.close();
         return warmup.getThroughput();
     }
+
+
+
 }
