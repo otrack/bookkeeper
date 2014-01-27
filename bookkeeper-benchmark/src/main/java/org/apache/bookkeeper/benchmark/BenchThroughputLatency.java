@@ -68,6 +68,8 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
     AtomicLong completedRequests = new AtomicLong(0);
     long duration = -1;
 
+    boolean isTerminated = false;
+
     static class Context {
         long localStartTime;
         long id;
@@ -143,6 +145,10 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         return duration;
     }
 
+    public void terminate(){
+        isTerminated = true;
+    }
+
     public void run() {
         LOG.info("Running...");
         long start = previous = System.currentTimeMillis();
@@ -164,7 +170,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         reporter.start();
         long beforeSend = System.nanoTime();
 
-        while(!Thread.currentThread().isInterrupted() && sent < sendLimit) {
+        while(!isTerminated && sent < sendLimit) {
             try {
                 sem.acquire();
                 if (sent == 10000) {
@@ -371,7 +377,7 @@ public class BenchThroughputLatency implements AddCallback, Runnable {
         }
         thread.start();
         Thread.sleep(totalTime);
-        thread.interrupt();
+        bench.terminate();
         thread.join();
 
         LOG.info("Calculating percentiles");
